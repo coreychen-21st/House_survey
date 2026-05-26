@@ -6,6 +6,8 @@ import imagehash
 
 
 def compute_image_hash(image_url):
+    if not image_url or not image_url.startswith("http"):
+        return None
     try:
         with httpx.Client(timeout=15, follow_redirects=True) as client:
             resp = client.get(image_url, headers={
@@ -15,8 +17,7 @@ def compute_image_hash(image_url):
                 return None
             img = Image.open(BytesIO(resp.content))
             return str(imagehash.phash(img, hash_size=8))
-    except Exception as e:
-        print(f"[IMG] 圖片hash計算失敗: {e}")
+    except Exception:
         return None
 
 

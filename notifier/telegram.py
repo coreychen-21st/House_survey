@@ -89,21 +89,15 @@ async def notify_listing(listing):
     image_urls = listing.get("image_urls", "")
     first_img = image_urls.split(",")[0] if image_urls else ""
 
-    try:
-        if first_img:
-            result = await send_photo_with_caption(first_img, caption)
-            if not result or not result.get("ok"):
-                print(f"[TG] 發送圖片失敗，改用文字: {result}")
-                result = await send_telegram_message(caption)
-        else:
-            result = await send_telegram_message(caption)
-        return result
-    except Exception as e:
-        print(f"[TG] 發送錯誤: {e}")
+    if first_img and first_img.startswith("http"):
         try:
-            return await send_telegram_message(caption)
-        except:
-            return None
+            result = await send_photo_with_caption(first_img, caption)
+            if result and result.get("ok"):
+                return result
+        except Exception:
+            pass
+
+    return await send_telegram_message(caption)
 
 
 async def notify_batch(listings):

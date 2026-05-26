@@ -5,23 +5,32 @@ from config.settings import MAX_PAGES
 
 class HousePriceCrawler(BaseCrawler):
     source = "houseprice"
-
     BASE_URL = "https://buy.houseprice.tw"
     API_URL = "https://www.houseprice.tw/ws/buygetWebCase/"
 
     def crawl(self):
         results = []
+        empty_count = 0
         for page in range(1, MAX_PAGES + 1):
+            if empty_count >= 3:
+                break
             print(f"[5168] 爬取第 {page} 頁")
             try:
                 items = self._fetch_page(page)
                 if not items:
-                    break
+                    empty_count += 1
+                    continue
+                count_before = len(results)
                 for item in items:
                     enriched = self.enrich_listing(item)
                     if self.basic_filter(enriched):
                         results.append(enriched)
-                print(f"[5168] 第 {page} 頁: {len(items)} 筆")
+                added = len(results) - count_before
+                print(f"[5168] 第 {page} 頁: {len(items)} 筆, 過濾後 +{added} 筆")
+                if added == 0 and len(items) > 0:
+                    empty_count += 1
+                else:
+                    empty_count = max(0, empty_count - 1)
                 self.sleep()
             except Exception as e:
                 print(f"[5168] 第 {page} 頁錯誤: {e}")
@@ -36,38 +45,24 @@ class HousePriceCrawler(BaseCrawler):
             "Referer": "https://www.houseprice.tw/",
             "Origin": "https://www.houseprice.tw",
         }
-
         payload = {
             "City": "台北市",
             "LTotalPrice": 300,
             "HTotalPrice": 1300,
-            "BuildPinMin": 19,
-            "BuildAgeMax": 46,
             "Page": page,
             "Rows": 30,
         }
-
         resp = httpx.post(self.API_URL, json=payload, headers=headers, timeout=30)
         if resp.status_code != 200:
             return []
-
         try:
             data = resp.json()
         except Exception:
             return []
-
         cases = data.get("webCaseGroupings", [])
-        items = []
-        for case in cases:
-            item = self._parse_case(case)
-            if item:
-                items.append(item)
-        return items
+        return [self._parse_case(c) for c in cases if isinstance(c, dict)]
 
     def _parse_case(self, case):
-        if not isinstance(case, dict):
-            return None
-
         sid = case.get("sid", "")
         title = case.get("caseName", "")
         address = case.get("simpAddress", "")
@@ -76,50 +71,42 @@ class HousePriceCrawler(BaseCrawler):
         building_age = self._num(case.get("buildAge"))
         building_type = case.get("caseTypeName", "")
         rooms = int(self._num(case.get("rm", 0)))
-        halls = 0
-        baths = 0
-
-        floor_str = ""
         from_floor = case.get("fromFloor", "")
         up_floor = case.get("upFloor", "")
-        if from_floor:
-            floor_str = f"{from_floor}" if not up_floor else f"{from_floor}/{up_floor}"
+        floor_str = f"{from_floor}" if not up_floor else f"{from_floor}/{up_floor}"
 
         img_urls = []
-        images = case.get("imageFileList", [])
-        if images:
-            for img in images:
-                url = img.get("casePicUrl", "") if isinstance(img, dict) else str(img)
+        images = case.get("imageFileList", []) or []
+        for img in images:
+            url = img.get("casePicUrl", "") if isinstance(img, dict) else str(img)
+            if url:
+                if not url.startswith("http"):
+                    url = f"https:{url}" if url.startswith("//") else ""
                 if url:
                     img_urls.append(url)
-        pic = case.get("picUrl", "")
-        if pic and not pic.startswith("http") and "." not in pic:
-            pic = ""
-        if pic and not pic.startswith(("http://", "https://")):
-            pic = f"https:{pic}" if pic.startswith("//") else f"https://{pic}"
-        if pic and pic not in img_urls:
-            img_urls.insert(0, pic)
-        img_urls_str = ",".join(img_urls[:10])
+
+        pic = case.get("picUrl", "") or ""
+        if pic and "." in pic and "/" in pic:
+            if not pic.startswith("http"):
+                pic = f"https:{pic}" if pic.startswith("//") else ""
+            if pic and pic not in img_urls:
+                img_urls.insert(0, pic)
 
         unit_price = 0
         if area_ping > 0 and total_price > 0:
             unit_price = round(total_price / area_ping, 2)
 
-        listed_date = case.get("newKeyInDate", "")
-        group_count = case.get("groupCount", 0)
-        if group_count > 1:
-            title = f"{title} (共{group_count}筆)"
-
         return {
             "title": title, "address": address, "district": "",
             "total_price": total_price, "unit_price": unit_price,
-            "area_ping": area_ping, "rooms": rooms, "halls": halls,
-            "baths": baths, "building_age": building_age,
+            "area_ping": area_ping, "rooms": rooms, "halls": 0,
+            "baths": 0, "building_age": building_age,
             "building_type": building_type, "floor": floor_str,
-            "image_urls": img_urls_str, "floorplan_url": "",
+            "image_urls": ",".join(img_urls[:10]) if img_urls else "",
+            "floorplan_url": "",
             "url": f"{self.BASE_URL}/house/{sid}" if sid else "",
-            "description": "", "listed_date": str(listed_date),
-            "house_id": str(sid),
+            "description": case.get("newKeyInDate", ""),
+            "listed_date": "", "house_id": str(sid),
         }
 
     def _num(self, val):

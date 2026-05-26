@@ -1,7 +1,3 @@
-"""
-House Survey - 定時爬蟲房源推送到 Telegram
-支援: 信義房屋 / 永慶房屋 / 591
-"""
 import asyncio
 import sys
 import os
@@ -17,19 +13,13 @@ from crawlers.houseprice import HousePriceCrawler
 from notifier.telegram import notify_batch
 
 
-async def run_crawl():
-    init_db()
-    print("=" * 50)
-    print("House Survey - 開始爬取房源")
-    print("=" * 50)
-
+def run_sync_crawlers():
     all_listings = []
-
     for name, crawler_cls in [
         ("永慶房屋", YungChingCrawler),
         ("信義房屋", SinyiCrawler),
-        ("591", F591Crawler),
         ("5168實價登錄比價王", HousePriceCrawler),
+        ("591", F591Crawler),
     ]:
         try:
             print(f"\n[{name}] 開始...")
@@ -39,6 +29,16 @@ async def run_crawl():
             print(f"[{name}] 完成: {len(items)} 筆")
         except Exception as e:
             print(f"[{name}] 失敗: {e}")
+    return all_listings
+
+
+async def main():
+    init_db()
+    print("=" * 50)
+    print("House Survey - 開始爬取房源")
+    print("=" * 50)
+
+    all_listings = run_sync_crawlers()
 
     print(f"\n合計爬取 {len(all_listings)} 筆原始物件")
 
@@ -56,9 +56,5 @@ async def run_crawl():
     print("\n完成!")
 
 
-def main():
-    asyncio.run(run_crawl())
-
-
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
