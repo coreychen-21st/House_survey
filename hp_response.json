@@ -1,0 +1,190 @@
+{
+  "webCaseGroupings": [
+    {
+      "sid": 29070265,
+      "groupID": "4edd0e94-5ada-47bd-9359-ebe23a41e284",
+      "caseName": "【四季旁低總美寓4+5】中信-小詠",
+      "simpAddress": "台北市文山區木柵路一段",
+      "totalPrice": 1298.0,
+      "buildPin": 19.28,
+      "buildAge": 56.0,
+      "fromFloor": 4,
+      "toFloor": 4,
+      "upFloor": 4,
+      "newKeyInDate": "今天上架",
+      "caseTypeName": "公寓",
+      "picUrl": "公寓",
+      "rm": 3,
+      "mPicUrl": "",
+      "staticMap": "",
+      "groupCount": 2,
+      "imageFileList": []
+    },
+    {
+      "sid": 29070259,
+      "groupID": "46c231ad-c77d-4005-9076-3f09925c7ee3",
+      "caseName": "🌿萬芳社區稀有一樓庭院美屋｜低公設大空間｜免爬梯低管理費",
+      "simpAddress": "台北市文山區萬安街",
+      "totalPrice": 1038.0,
+      "buildPin": 13.92,
+      "buildAge": null,
+      "fromFloor": 1,
+      "toFloor": 1,
+      "upFloor": 1,
+      "newKeyInDate": "今天上架",
+      "caseTypeName": "大樓",
+      "picUrl": "大樓",
+      "rm": 2,
+      "mPicUrl": "",
+      "staticMap": "",
+      "groupCount": 1,
+      "imageFileList": []
+    },
+    {
+      "sid": 29067261,
+      "groupID": "e0b58eb6-f654-43e5-b95a-b4a1eb5e7a96",
+      "caseName": "🧡獨家🧡福元l靜巷美妝陽光宅🧡我是接案人",
+      "simpAddress": "台北市大同區南京西路",
+      "totalPrice": 1258.0,
+      "buildPin": 12.71,
+      "buildAge": 44.4,
+      "fromFloor": 4,
+      "toFloor": 4,
+      "upFloor": 6,
+      "newKeyInDate": "昨天上架",
+      "caseTypeName": "華廈",
+      "picUrl": "華廈",
+      "rm": 1,
+      "mPicUrl": "",
+      "staticMap": "",
+      "groupCount": 6,
+      "imageFileList": [
+        {
+          "caseFrom": "HousePrice",
+          "casePicUrl": "https://image.houseprice.tw/p1-hpimage/MTEzMzA3MzhocGltYWdl/58e99b847b064903_1477x1108.jpg",
+          "caseFromName": "5168"
+        }
+      ]
+    },
+    {
+      "sid": 29069343,
+      "groupID": "6db20a07-aea2-4681-96f1-cf9b212d52d8",
+      "caseName": "靜巷／邊間／陽台／有管理",
+      "simpAddress": "台北市中山區新生北路二段",
+      "totalPrice": 998.0,
+      "buildPin": 11.84,
+      "buildAge": 31.5,
+      "fromFloor": 2,
+      "toFloor": 2,
+      "upFloor": 8,
+      "newKeyInDate": "昨天上架",
+      "caseTypeName": "華廈",
+      "picUrl": "華廈",
+      "rm": 1,
+      "mPicUrl": "",
+      "staticMap": "",
+      "groupCount": 1,
+      "imageFileList": [
+        {
+          "caseFrom": "Sinyi",
+          "casePicUrl": "https://res.sinyi.com.tw/buy/8858HY/bigimg/A.JPG",
+          "caseFromName": "信義房屋"
+        }
+      ]
+    },
+    {
+      "sid": 29064156,
+      "groupID": "58653bd4-72e4-4421-b8f3-973e941ecc6a",
+      "caseName": "104西門捷運收租屋1",
+      "simpAddress": "台北市中正區衡陽路",
+      "totalPrice": 998.0,
+      "buildPin": 15.04,
+      "buildAge": 45.2,
+      "fromFloor": 3,
+      "toFloor": 3,
+      "upFloor": 15,
+      "newKeyInDate": "2天前上架",
+      "caseTypeName": "大樓",
+      "picUrl": "大樓",
+      "rm": 1,
+      "mPicUrl": "",
+      "staticMap": "",
+      "groupCount": 1,
+      "imageFileList": [
+        {
+          "caseFrom": "Rakuya",
+          "casePicUrl": "https://static.rakuya.com.tw/r1/n026/96/57/33494026_1_b.jpeg?1773122092",
+          "caseFromName": "樂屋網"
+        }
+      ]
+    },
+    {
+      "sid": 29063739,
+      "groupID": "b64c68d4-178a-4025-975f-ae3ffa02f3b5",
+      "caseName": "中和街兩房雅寓",
+      "simpAddress": "台北市北投區中和街",
+      "totalPrice": 1288.0,
+      "buildPin": 24.0,
+      "buildAge": 48.0,
+      "fromFloor": 3,
+      "toFloor": 3,
+      "upFloor": 4,
+      "newKeyInDate": "2天前上架",
+      "caseTypeName": "公寓",
+      "picUrl": "公寓",
+      "rm": 2,
+      "mPicUrl": "",
+      "staticMap": "",
+      "groupCount": 1,
+      "imageFileList": [
+        {
+          "caseFrom": "Sinyi",
+          "casePicUrl": "https://res.sinyi.com.tw/buy/4402NB/bigimg/A.JPG",
+          "caseFromName": "信義房屋"
+        }
+      ]
+    },
+    {
+      "sid": 29055886,
+      "groupID": "ddaec739-194b-4f69-b160-173f9515da52",
+      "caseName": "農安雙城電梯套房中山國小站＃農安街",
+      "simpAddress": "台北市中山區農安街",
+      "totalPrice": 692.0,
+      "buildPin": 12.0,
+      "buildAge": 37.0,
+      "fromFloor": 7,
+      "toFloor": 7,
+      "upFloor": 9,
+      "newKeyInDate": "2天前上架",
+      "caseTypeName": "大樓",
+      "picUrl": "大樓",
+      "rm": 1,
+      "mPicUrl": "",
+      "staticMap": "",
+      "groupCount": 1,
+      "imageFileList": []
+    },
+    {
+      "sid": 29055859,
+      "groupID": "c7048af1-3624-4942-8834-ac5f449c9891",
+      "caseName": "泉源公園義方國小一樓＃珠海路",
+      "simpAddress": "台北市北投區珠海路",
+      "totalPrice": 1250.0,
+      "buildPin": 80.0,
+      "buildAge": 37.0,
+      "fromFloor": 1,
+      "toFloor": 1,
+      "upFloor": 3,
+      "newKeyInDate": "2天前上架",
+      "caseTypeName": "公寓",
+      "picUrl": "公寓",
+      "rm": 4,
+      "mPicUrl": "",
+      "staticMap": "",
+      "groupCount": 1,
+      "imageFileList": []
+    }
+  ],
+  "code": 200,
+  "message": "Success"
+}
