@@ -2,7 +2,7 @@ name: House Survey Crawler
 
 on:
   schedule:
-    - cron: '0 9,19 * * *'
+    - cron: "0 9,19 * * *"
   workflow_dispatch:
 
 jobs:
@@ -17,31 +17,26 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Install Playwright browsers
-        run: |
-          playwright install --with-deps chromium
+        run: playwright install --with-deps chromium
 
-      - name: Pre-fetch playwright browsers (warmup)
+      - name: Playwright warmup
         run: |
           python -c "
 from playwright.sync_api import sync_playwright
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     browser.close()
-    print('Playwright warmup OK')
+print('Playwright warmup OK')
 "
 
-      - name: Create data directory and restore DB
-        run: |
-          mkdir -p data
-          echo "Dir listing before:"
-          ls -la data/ || true
+      - name: Create data directory
+        run: mkdir -p data
 
       - name: Run crawler
         env:
@@ -49,16 +44,16 @@ with sync_playwright() as p:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python main.py
 
-      - name: Show DB stats after run
+      - name: Show DB stats
         run: |
           python -c "
 import sqlite3
 conn = sqlite3.connect('data/listings.db')
 total = conn.execute('SELECT COUNT(*) FROM listings').fetchone()[0]
 notified = conn.execute('SELECT COUNT(*) FROM listings WHERE is_notified=1').fetchone()[0]
-sources = conn.execute(\"SELECT source, COUNT(*) FROM listings GROUP BY source\").fetchall()
-print(f'DB stats: total={total}, notified={notified}')
+sources = conn.execute('SELECT source, COUNT(*) FROM listings GROUP BY source').fetchall()
+print('DB stats: total={}, notified={}'.format(total, notified))
 for s, c in sources:
-    print(f'  {s}: {c}')
+    print('  {}: {}'.format(s, c))
 conn.close()
 "
