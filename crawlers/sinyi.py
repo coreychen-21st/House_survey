@@ -3,7 +3,7 @@ import json
 import httpx
 from bs4 import BeautifulSoup
 from .base import BaseCrawler
-from config.settings import MAX_PAGES
+from config.settings import MAX_PAGES, PRICE_MIN, PRICE_MAX, MAX_BUILDING_AGE, MIN_AREA_PING, MIN_ROOMS
 
 
 class SinyiCrawler(BaseCrawler):
@@ -12,7 +12,8 @@ class SinyiCrawler(BaseCrawler):
 
     def crawl(self):
         results = []
-        for page in range(1, 51):
+        empty_streak = 0
+        for page in range(1, MAX_PAGES + 1):
             print(f"[信義] 爬取第 {page} 頁")
             try:
                 html = self._fetch(page)
@@ -20,15 +21,23 @@ class SinyiCrawler(BaseCrawler):
                     break
                 items = self._parse_all(html, page)
                 if not items:
-                    break
+                    empty_streak += 1
+                    if empty_streak >= 2:
+                        break
+                    continue
+                empty_streak = 0
+
+                passed = 0
                 for item in items:
                     enriched = self.enrich_listing(item)
                     ok, reason = self.basic_filter_debug(enriched)
                     if ok:
                         results.append(enriched)
+                        passed += 1
                     else:
-                        print(f"  過濾: {item.get('title','')[:30]} | price={item.get('total_price')} area={item.get('area_ping')} rooms={item.get('rooms')} age={item.get('building_age')} reason={reason}")
-                print(f"[信義] 第 {page} 頁: {len(items)} 筆")
+                        if page <= 2:
+                            print(f"  過濾: {item.get('title','')[:30]} | price={item.get('total_price')} area={item.get('area_ping')} rooms={item.get('rooms')} age={item.get('building_age')} reason={reason}")
+                print(f"[信義] 第 {page} 頁: {len(items)} 筆, 過濾後 +{passed} 筆")
                 self.sleep()
             except Exception as e:
                 print(f"[信義] 第 {page} 頁錯誤: {e}")
@@ -38,8 +47,12 @@ class SinyiCrawler(BaseCrawler):
 
     def _fetch(self, page):
         params = {
-            "region": "taipei-city", "price-min": "300", "price-max": "1300",
-            "age-max": "46", "area-min": "19", "room-min": "2"
+            "region": "taipei-city",
+            "price-min": str(PRICE_MIN),
+            "price-max": str(PRICE_MAX),
+            "age-max": str(MAX_BUILDING_AGE),
+            "area-min": str(MIN_AREA_PING),
+            "room-min": str(MIN_ROOMS),
         }
         if page > 1:
             params["page"] = str(page)
@@ -57,7 +70,8 @@ class SinyiCrawler(BaseCrawler):
         if resp.status_code != 200:
             return None
         html = resp.text
-        print(f"  HTML length={len(html)}, 含 'houseNo' = {html.count('houseNo')}, 含 'list' = {html.count('\"list\"')}")
+        list_marker_count = html.count('"list"')
+        print(f"  HTML length={len(html)}, 含 'houseNo' = {html.count('houseNo')}, 含 'list' = {list_marker_count}")
         return html
 
     def _parse_all(self, html, page):
@@ -68,6 +82,12 @@ class SinyiCrawler(BaseCrawler):
         if json_items:
             items.extend(json_items)
         print(f"  JSON list 解析: {len(json_items)} 筆")
+
+        # 1b. Parse __NEXT_DATA__ Redux list (page>=2 often lives here)
+        next_items = self._parse_next_data_list(html)
+        if next_items:
+            items.extend(next_items)
+        print(f"  NEXT_DATA 解析: {len(next_items)} 筆")
 
         # 2. Parse HTML listing cards (SSR 渲染的搜尋結果)
         html_items = self._parse_html_cards(html)
@@ -104,6 +124,36 @@ class SinyiCrawler(BaseCrawler):
             unique.append(item)
 
         return unique
+
+    def _parse_next_data_list(self, html):
+        items = []
+        soup = BeautifulSoup(html, "lxml")
+        script = soup.select_one("script#__NEXT_DATA__")
+        if not script:
+            return items
+        raw = script.string or script.get_text() or ""
+        if not raw.strip():
+            return items
+
+        try:
+            data = json.loads(raw)
+        except Exception:
+            return items
+
+        def walk(obj):
+            if isinstance(obj, dict):
+                if "houseNo" in obj and ("totalPrice" in obj or "name" in obj):
+                    item = self._parse_json_obj(obj)
+                    if item:
+                        items.append(item)
+                for v in obj.values():
+                    walk(v)
+            elif isinstance(obj, list):
+                for v in obj:
+                    walk(v)
+
+        walk(data)
+        return items
 
     def _parse_json_list(self, html):
         items = []
@@ -218,7 +268,7 @@ class SinyiCrawler(BaseCrawler):
             for p in prices:
                 try:
                     v = float(p.replace(",", ""))
-                    if 300 <= v <= 1300:
+                    if PRICE_MIN <= v <= PRICE_MAX:
                         total_price = v
                         break
                 except:

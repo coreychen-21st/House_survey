@@ -1,7 +1,7 @@
 import json
 from playwright.sync_api import sync_playwright
 from .base import BaseCrawler
-from config.settings import MAX_PAGES
+from config.settings import MAX_PAGES, PRICE_MIN, PRICE_MAX
 
 
 class HousePriceCrawler(BaseCrawler):
@@ -52,8 +52,11 @@ class HousePriceCrawler(BaseCrawler):
                     count_before = len(results)
                     for item in items:
                         enriched = self.enrich_listing(item)
-                        if self.basic_filter(enriched):
+                        ok, reason = self.basic_filter_debug(enriched)
+                        if ok:
                             results.append(enriched)
+                        elif pg <= 2:
+                            print(f"  過濾: {item.get('title','')[:30]} | price={item.get('total_price')} area={item.get('area_ping')} rooms={item.get('rooms')} age={item.get('building_age')} reason={reason}")
                     added = len(results) - count_before
                     print(f"[5168] 第 {pg} 頁: {len(items)} 筆, 過濾後 +{added} 筆")
                     if added == 0 and len(items) > 0:
@@ -76,8 +79,8 @@ class HousePriceCrawler(BaseCrawler):
     def _fetch_page_api(self, page, pg):
         payload = {
             "City": "台北市",
-            "LTotalPrice": 300,
-            "HTotalPrice": 1300,
+            "LTotalPrice": PRICE_MIN,
+            "HTotalPrice": PRICE_MAX,
             "Page": pg,
             "Rows": 30,
         }

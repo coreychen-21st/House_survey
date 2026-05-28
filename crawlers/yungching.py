@@ -2,7 +2,7 @@ import re
 from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 from .base import BaseCrawler
-from config.settings import MAX_PAGES
+from config.settings import MAX_PAGES, PRICE_MIN, PRICE_MAX
 
 
 class YungChingCrawler(BaseCrawler):
@@ -86,7 +86,7 @@ class YungChingCrawler(BaseCrawler):
         return results
 
     def _build_url(self, page):
-        base = f"{self.BASE_URL}/region/%E5%8F%B0%E5%8C%97%E5%B8%82-_c/totalprice_300_1300/age_0_46/area_19_/room_2_"
+        base = f"{self.BASE_URL}/region/%E5%8F%B0%E5%8C%97%E5%B8%82-_c/totalprice_{PRICE_MIN}_{PRICE_MAX}/age_0_46/area_19_/room_2_"
         if page == 1:
             return base
         return base + f"?pg={page}"
@@ -201,7 +201,7 @@ class YungChingCrawler(BaseCrawler):
                 for p in prices:
                     try:
                         v = float(p.replace(",", ""))
-                        if 300 <= v <= 1300:
+                        if PRICE_MIN <= v <= PRICE_MAX:
                             total_price = v
                             break
                     except:

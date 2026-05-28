@@ -13,6 +13,7 @@ class HousefunCrawler(BaseCrawler):
     def crawl(self):
         results = []
         empty_streak = 0
+        no_match_streak = 0
 
         for page in range(1, MAX_PAGES + 1):
             url = self._build_url(page)
@@ -42,6 +43,16 @@ class HousefunCrawler(BaseCrawler):
                         added += 1
 
                 print(f"[好房網] 第 {page} 頁: {len(items)} 筆, 過濾後 +{added} 筆")
+
+                if added == 0:
+                    no_match_streak += 1
+                else:
+                    no_match_streak = 0
+
+                if no_match_streak >= 3:
+                    print(f"[好房網] 連續 {no_match_streak} 頁無符合物件，停止")
+                    break
+
                 self.sleep()
 
             except Exception as e:
