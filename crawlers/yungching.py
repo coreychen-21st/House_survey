@@ -13,16 +13,18 @@ class YungChingCrawler(BaseCrawler):
         results = []
         for page in range(1, MAX_PAGES + 1):
             url = self._build_url(page)
-            print(f"[永慶] 爬取第 {page} 頁")
+            print(f"[永慶] 爬取第 {page} 頁, url={url}")
             try:
                 items = self._fetch_and_parse(url)
                 if not items:
                     continue
+                filtered_count = 0
                 for item in items:
                     enriched = self.enrich_listing(item)
                     if self.basic_filter(enriched):
                         results.append(enriched)
-                print(f"[永慶] 第 {page} 頁: {len(items)} 筆, 過濾後 {sum(1 for i in items if self.basic_filter(self.enrich_listing(i)))} 筆")
+                        filtered_count += 1
+                print(f"[永慶] 第 {page} 頁: {len(items)} 筆, 過濾後 {filtered_count} 筆")
             except Exception as e:
                 print(f"[永慶] 第 {page} 頁錯誤: {e}")
                 import traceback
@@ -39,19 +41,47 @@ class YungChingCrawler(BaseCrawler):
         return base + f"?pg={page}"
 
     def _fetch_and_parse(self, url):
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
+        }
         resp = httpx.get(url, headers=headers, timeout=30, follow_redirects=True)
+        print(f"  HTTP {resp.status_code}, final_url={resp.url}")
         if resp.status_code != 200:
             return []
-        soup = BeautifulSoup(resp.text, "lxml")
 
-        cards = soup.select("a.link[href*='house/']")
-        if not cards:
-            cards = soup.select("a[href*='house/']")
+        html = resp.text
+        print(f"  HTML length={len(html)}, 含 'house/' = {html.count('house/')}")
+
+        soup = BeautifulSoup(html, "lxml")
+
+        # 嘗試多種 selector
+        cards = []
+        selectors_to_try = [
+            "a.link[href*='house/']",
+            "a[href*='house/']",
+            "[class*='case-item']",
+            "[class*='card']",
+            "[class*='listing']",
+            "li[class*='item']",
+        ]
+        for sel in selectors_to_try:
+            cards = soup.select(sel)
+            if cards:
+                print(f"  選擇器 '{sel}' 找到 {len(cards)} 個卡片")
+                break
+
         if not cards:
             cards = soup.find_all("a", href=re.compile(r"house/\d+"))
+            print(f"  正則 fallback 找到 {len(cards)} 個卡片")
 
-        print(f"  找到 {len(cards)} 個卡片")
+        # If still no cards, dump HTML snippet for diagnosis
+        if not cards:
+            snippet = html[:3000].replace("\n", " ")
+            print(f"  HTML snippet: {snippet[:800]}...")
+            return []
+
         items = []
         for card in cards:
             href = card.get("href", "")

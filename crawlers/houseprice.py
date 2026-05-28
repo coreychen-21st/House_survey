@@ -40,10 +40,12 @@ class HousePriceCrawler(BaseCrawler):
 
     def _fetch_page(self, page):
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
             "Content-Type": "application/json",
             "Referer": "https://www.houseprice.tw/",
             "Origin": "https://www.houseprice.tw",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
         }
         payload = {
             "City": "台北市",
@@ -53,13 +55,20 @@ class HousePriceCrawler(BaseCrawler):
             "Rows": 30,
         }
         resp = httpx.post(self.API_URL, json=payload, headers=headers, timeout=30)
+        print(f"  API POST → HTTP {resp.status_code}, response length={len(resp.text)}")
         if resp.status_code != 200:
             return []
         try:
             data = resp.json()
-        except Exception:
+        except Exception as e:
+            print(f"  JSON parse error: {e}, raw={resp.text[:300]}")
             return []
         cases = data.get("webCaseGroupings", [])
+        total_count = data.get("count", data.get("totalCount", "unknown"))
+        print(f"  API totalCount={total_count}, webCaseGroupings={len(cases)}")
+        if not cases:
+            print(f"  API keys: {list(data.keys())[:10]}")
+            print(f"  API sample: {str(data)[:500]}")
         return [self._parse_case(c) for c in cases if isinstance(c, dict)]
 
     def _parse_case(self, case):

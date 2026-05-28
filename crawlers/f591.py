@@ -15,7 +15,10 @@ class F591Crawler(BaseCrawler):
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             context = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+                extra_http_headers={
+                    "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
+                }
             )
             page = context.new_page()
 
@@ -30,34 +33,26 @@ class F591Crawler(BaseCrawler):
 
                     listings = page.evaluate("""() => {
                         const results = [];
-                        const items = document.querySelectorAll('[class*="house-item"], [class*="houseItem"], [class*="list-item"], [class*="listItem"], [class*="vue"]');
-                        if (!items.length) {
-                            const all = document.querySelectorAll('a[href*="detail"]');
-                            all.forEach(a => {
-                                const parent = a.closest('li, div[class]');
-                                const text = (parent || a).innerText;
-                                const img = (parent || a).querySelector('img');
-                                if (text.includes('坪') || text.includes('萬')) {
-                                    results.push({
-                                        title: (parent || a).querySelector('[class*="title"], h3')?.innerText || text.split('\\n')[0].trim(),
-                                        price: text,
-                                        area: text,
-                                        link: a.href,
-                                        image: img ? img.src : '',
-                                        address: text
-                                    });
-                                }
-                            });
-                            return results;
-                        }
-                        items.forEach(el => {
+                        const allAnchors = document.querySelectorAll('a[href*="detail"]');
+                        const seen = new Set();
+                        allAnchors.forEach(a => {
+                            const href = a.href;
+                            if (seen.has(href)) return;
+                            seen.add(href);
+                            const parent = a.closest('li, div[class], section[class]') || a;
+                            const text = (parent || a).innerText || '';
+                            const img = (parent || a).querySelector('img');
+                            const titleEl = (parent || a).querySelector('[class*="title"], h3, [class*="subject"]');
+                            const priceEl = (parent || a).querySelector('[class*="price"]');
+                            const addrEl = (parent || a).querySelector('[class*="address"], [class*="addr"]');
+                            const areaEl = (parent || a).querySelector('[class*="area"], [class*="ping"], [class*="sqft"]');
                             results.push({
-                                title: el.querySelector('[class*="title"], h3')?.innerText || '',
-                                price: el.querySelector('[class*="price"], [class*="total-price"]')?.innerText || '',
-                                area: el.querySelector('[class*="area"], [class*="ping"]')?.innerText || '',
-                                link: el.querySelector('a[href*="detail"]')?.href || '',
-                                image: el.querySelector('img')?.src || '',
-                                address: el.querySelector('[class*="address"], [class*="addr"]')?.innerText || ''
+                                title: titleEl ? titleEl.innerText.trim() : '',
+                                price: priceEl ? priceEl.innerText.trim() : text,
+                                area: areaEl ? areaEl.innerText.trim() : text,
+                                link: href,
+                                image: img ? (img.src || img.getAttribute('data-src') || '') : '',
+                                address: addrEl ? addrEl.innerText.trim() : text.split('\\n').slice(0,3).join(' ')
                             });
                         });
                         return results;

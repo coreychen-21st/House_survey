@@ -40,14 +40,22 @@ class SinyiCrawler(BaseCrawler):
         }
         if page > 1:
             params["page"] = str(page)
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
+        }
+        url = f"{self.BASE_URL}/buy/list"
         resp = httpx.get(
-            f"{self.BASE_URL}/buy/list", params=params,
+            url, params=params,
             headers=headers, timeout=30, follow_redirects=True
         )
+        print(f"  HTTP {resp.status_code}, url={resp.url}")
         if resp.status_code != 200:
             return None
-        return resp.text
+        html = resp.text
+        print(f"  HTML length={len(html)}, 含 'houseNo' = {html.count('houseNo')}, 含 'list' = {html.count('\"list\"')}")
+        return html
 
     def _parse_all(self, html, page):
         items = []
@@ -56,14 +64,17 @@ class SinyiCrawler(BaseCrawler):
         json_items = self._parse_json_list(html)
         if json_items:
             items.extend(json_items)
+        print(f"  JSON list 解析: {len(json_items)} 筆")
 
         # 2. Parse HTML listing cards (SSR 渲染的搜尋結果)
         html_items = self._parse_html_cards(html)
         if html_items:
             items.extend(html_items)
+        print(f"  HTML cards 解析: {len(html_items)} 筆")
 
         # 3. Parse JSON-LD structured data
         soup = BeautifulSoup(html, "lxml")
+        ld_items = []
         for script in soup.find_all("script", type="application/ld+json"):
             try:
                 data = json.loads(script.string or "")
@@ -73,9 +84,12 @@ class SinyiCrawler(BaseCrawler):
                             if elem.get("@type") == "ListItem":
                                 item = self._parse_ld_item(elem)
                                 if item:
-                                    items.append(item)
+                                    ld_items.append(item)
             except:
                 pass
+        if ld_items:
+            items.extend(ld_items)
+        print(f"  JSON-LD 解析: {len(ld_items)} 筆")
 
         seen_ids = set()
         unique = []

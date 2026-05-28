@@ -33,6 +33,9 @@ def deduplicate_cross_source(listings):
 def merge_and_deduplicate(all_listings):
     """
     合併所有來源 + 跨站去重 + 與歷史資料比對
+    - 跨來源去重：同 address_hash 只保留最低價
+    - 歷史去重：相同 (source, house_id) 已存在則跳過
+    - 價格檢查：同地址已通知過才跳過（除非降價）
     """
     if not all_listings:
         return []
@@ -41,13 +44,24 @@ def merge_and_deduplicate(all_listings):
 
     final = []
     for item in deduped:
+        source = item.get("source", "")
+        house_id = item.get("house_id", "")
+
+        # 相同來源 + 相同 ID → 已收錄過，跳過
+        if source and house_id and listing_exists(source, house_id):
+            continue
+
+        # 同地址曾通知過 → 僅在降價時才重新通知
         addr_hash = item.get("address_hash", "")
         if addr_hash:
             existing = find_similar_by_address(addr_hash)
             if existing:
-                existing_prices = [e["total_price"] for e in existing]
-                if item["total_price"] >= min(existing_prices):
-                    continue
+                # 只看已通知的歷史紀錄
+                existing_notified = [e for e in existing if e.get("is_notified")]
+                if existing_notified:
+                    min_notified_price = min(e["total_price"] for e in existing_notified)
+                    if item["total_price"] >= min_notified_price:
+                        continue
 
         final.append(item)
 
