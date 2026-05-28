@@ -1,4 +1,3 @@
-import asyncio
 import sys
 import os
 import traceback
@@ -22,12 +21,13 @@ def _show_db_stats():
     print(f"[DB] 總筆數: {total}, 已通知: {notified}, 待通知: {total - notified}")
 
 
-def run_sync_crawlers():
+def run_all_crawlers():
     all_listings = []
     for name, crawler_cls in [
         ("永慶房屋", YungChingCrawler),
         ("信義房屋", SinyiCrawler),
         ("5168實價登錄比價王", HousePriceCrawler),
+        ("591", F591Crawler),
     ]:
         try:
             print(f"\n[{name}] 開始...")
@@ -41,25 +41,14 @@ def run_sync_crawlers():
     return all_listings
 
 
-async def main():
+def main():
     init_db()
     _show_db_stats()
     print("=" * 50)
     print("House Survey - 開始爬取房源")
     print("=" * 50)
 
-    all_listings = run_sync_crawlers()
-
-    # 591 uses sync Playwright which conflicts with asyncio event loop
-    # Run it in a separate thread via to_thread()
-    try:
-        print("\n[591] 開始...")
-        items = await asyncio.to_thread(lambda: F591Crawler().crawl())
-        all_listings.extend(items)
-        print(f"[591] 完成: {len(items)} 筆")
-    except Exception as e:
-        print(f"[591] 失敗: {e}")
-        traceback.print_exc()
+    all_listings = run_all_crawlers()
 
     print(f"\n合計爬取 {len(all_listings)} 筆原始物件")
 
@@ -70,7 +59,7 @@ async def main():
     print(f"待通知物件: {len(new_listings)} 筆")
 
     if new_listings:
-        await notify_batch(new_listings)
+        notify_batch(new_listings)
         for item in new_listings:
             mark_notified(item["id"])
 
@@ -79,4 +68,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

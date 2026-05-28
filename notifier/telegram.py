@@ -1,4 +1,4 @@
-import asyncio
+import time
 import httpx
 from config.settings import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
@@ -48,13 +48,13 @@ def format_listing_message(listing):
     return "\n".join(msg_parts)
 
 
-async def send_telegram_message(text, parse_mode="Markdown", disable_web_page_preview=False):
+def _send_telegram_message(text, parse_mode="Markdown", disable_web_page_preview=False):
     if not TELEGRAM_CHAT_ID:
         print("[TG] 未設定 TELEGRAM_CHAT_ID，略過發送")
         return None
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(
+    with httpx.Client(timeout=30) as client:
+        resp = client.post(
             f"{TELEGRAM_API}/sendMessage",
             json={
                 "chat_id": TELEGRAM_CHAT_ID,
@@ -66,13 +66,13 @@ async def send_telegram_message(text, parse_mode="Markdown", disable_web_page_pr
         return resp.json()
 
 
-async def send_photo_with_caption(image_url, caption):
+def _send_photo_with_caption(image_url, caption):
     if not TELEGRAM_CHAT_ID:
         print("[TG] 未設定 TELEGRAM_CHAT_ID，略過發送")
         return None
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(
+    with httpx.Client(timeout=30) as client:
+        resp = client.post(
             f"{TELEGRAM_API}/sendPhoto",
             json={
                 "chat_id": TELEGRAM_CHAT_ID,
@@ -84,23 +84,23 @@ async def send_photo_with_caption(image_url, caption):
         return resp.json()
 
 
-async def notify_listing(listing):
+def notify_listing(listing):
     caption = format_listing_message(listing)
     image_urls = listing.get("image_urls", "")
     first_img = image_urls.split(",")[0] if image_urls else ""
 
     if first_img and first_img.startswith("http"):
         try:
-            result = await send_photo_with_caption(first_img, caption)
+            result = _send_photo_with_caption(first_img, caption)
             if result and result.get("ok"):
                 return result
         except Exception:
             pass
 
-    return await send_telegram_message(caption)
+    return _send_telegram_message(caption)
 
 
-async def notify_batch(listings):
+def notify_batch(listings):
     if not TELEGRAM_CHAT_ID:
         print("[TG] 未設定 TELEGRAM_CHAT_ID，略過發送")
         return
@@ -109,7 +109,7 @@ async def notify_batch(listings):
         print("[TG] 沒有新物件需要通知")
         return
 
-    await send_telegram_message(
+    _send_telegram_message(
         f"🏠 *House Survey 新物件通知*\n"
         f"共發現 {len(listings)} 個符合條件的新物件\n"
         f"已過濾重複、凶宅、海砂屋等問題物件"
@@ -117,7 +117,7 @@ async def notify_batch(listings):
 
     for listing in listings[:20]:
         try:
-            await notify_listing(listing)
-            await asyncio.sleep(1)
+            notify_listing(listing)
+            time.sleep(1)
         except Exception as e:
             print(f"[TG] 發送失敗: {e}")

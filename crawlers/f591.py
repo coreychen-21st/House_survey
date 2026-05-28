@@ -10,7 +10,6 @@ class F591Crawler(BaseCrawler):
     def crawl(self):
         print("[591] 正在使用 Playwright 渲染爬取...")
         results = []
-        base_url = "https://sale.591.com.tw/?shType=list&regionid=1&totalprice=300_1300&area=19_&room=2_&firstRow=0&totalRows=30"
 
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
@@ -24,16 +23,33 @@ class F591Crawler(BaseCrawler):
 
             offset = 0
             while offset < 1500:
-                url = base_url.replace("firstRow=0", f"firstRow={offset}")
+                url = f"https://sale.591.com.tw/?shType=list&regionid=1&totalprice=300_1300&area=19_&room=2_&firstRow={offset}&totalRows=30"
                 print(f"[591] offset={offset}")
 
                 try:
-                    page.goto(url, timeout=30000, wait_until="networkidle")
-                    page.wait_for_timeout(3000)
+                    page.goto(url, timeout=60000, wait_until="load")
+                    page.wait_for_timeout(5000)
+
+                    # 滾動觸發 lazy loading
+                    page.evaluate("window.scrollBy(0, 300)")
+                    page.wait_for_timeout(2000)
+                    page.evaluate("window.scrollBy(0, 600)")
+                    page.wait_for_timeout(2000)
+
+                    # 診斷: 查看頁面標題和鏈接數
+                    debug_info = page.evaluate("""() => {
+                        return {
+                            title: document.title,
+                            detailLinks: document.querySelectorAll('a[href*="detail"]').length,
+                            totalLinks: document.querySelectorAll('a').length,
+                            bodyText: document.body ? document.body.innerText.substring(0, 200) : '',
+                        };
+                    }""")
+                    print(f"  Debug: title={debug_info['title']}, detailLinks={debug_info['detailLinks']}, totalLinks={debug_info['totalLinks']}")
 
                     listings = page.evaluate("""() => {
                         const results = [];
-                        const allAnchors = document.querySelectorAll('a[href*="detail"]');
+                        const allAnchors = document.querySelectorAll('a[href*="detail/2/"]');
                         const seen = new Set();
                         allAnchors.forEach(a => {
                             const href = a.href;
@@ -55,10 +71,31 @@ class F591Crawler(BaseCrawler):
                                 address: addrEl ? addrEl.innerText.trim() : text.split('\\n').slice(0,3).join(' ')
                             });
                         });
+                        if (!results.length) {
+                            const allDivs = document.querySelectorAll('div[class*="list"], div[class*="item"], div[class*="switch"], article, section');
+                            for (const el of allDivs) {
+                                const anchors = el.querySelectorAll('a[href*="detail/2/"]');
+                                for (const a of anchors) {
+                                    if (seen.has(a.href)) continue;
+                                    seen.add(a.href);
+                                    const text = el.innerText || '';
+                                    const img = el.querySelector('img');
+                                    results.push({
+                                        title: (el.querySelector('[class*="title"], h3') || {}).innerText || '',
+                                        price: text,
+                                        area: text,
+                                        link: a.href,
+                                        image: img ? (img.src || '') : '',
+                                        address: text.split('\\n').slice(0,3).join(' ')
+                                    });
+                                }
+                            }
+                        }
                         return results;
                     }""")
 
                     if not listings or len(listings) == 0:
+                        print(f"  No listings found, body sample: {debug_info['bodyText']}")
                         break
 
                     for li in listings:
@@ -74,6 +111,8 @@ class F591Crawler(BaseCrawler):
 
                 except Exception as e:
                     print(f"[591] offset={offset} 錯誤: {e}")
+                    import traceback
+                    traceback.print_exc()
                     break
 
             browser.close()

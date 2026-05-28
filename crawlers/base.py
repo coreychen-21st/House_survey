@@ -75,6 +75,25 @@ class BaseCrawler:
 
         return True
 
+    def basic_filter_debug(self, data):
+        total_price = data.get("total_price", 0)
+        if total_price < PRICE_MIN or total_price > PRICE_MAX:
+            return False, f"price={total_price}"
+        area_ping = data.get("area_ping", 0)
+        if area_ping < MIN_AREA_PING:
+            return False, f"area={area_ping}"
+        rooms = data.get("rooms", 0)
+        if rooms < MIN_ROOMS and rooms != 0:
+            return False, f"rooms={rooms}"
+        building_age = data.get("building_age", 0)
+        if building_age > MAX_BUILDING_AGE and building_age > 0:
+            return False, f"age={building_age}"
+        if self.contains_negative_keywords(data.get("title", "")):
+            return False, "negative_title"
+        if self.contains_negative_keywords(data.get("description", "")):
+            return False, "negative_desc"
+        return True, ""
+
     def enrich_listing(self, data):
         data["source"] = self.source
         data["address_hash"] = address_fingerprint(

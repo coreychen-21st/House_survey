@@ -23,8 +23,11 @@ class SinyiCrawler(BaseCrawler):
                     break
                 for item in items:
                     enriched = self.enrich_listing(item)
-                    if self.basic_filter(enriched):
+                    ok, reason = self.basic_filter_debug(enriched)
+                    if ok:
                         results.append(enriched)
+                    else:
+                        print(f"  過濾: {item.get('title','')[:30]} | price={item.get('total_price')} area={item.get('area_ping')} rooms={item.get('rooms')} age={item.get('building_age')} reason={reason}")
                 print(f"[信義] 第 {page} 頁: {len(items)} 筆")
                 self.sleep()
             except Exception as e:

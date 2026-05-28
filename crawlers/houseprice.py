@@ -1,5 +1,6 @@
+import json
+from playwright.sync_api import sync_playwright
 from .base import BaseCrawler
-import httpx
 from config.settings import MAX_PAGES
 
 
@@ -9,60 +10,92 @@ class HousePriceCrawler(BaseCrawler):
     API_URL = "https://www.houseprice.tw/ws/buygetWebCase/"
 
     def crawl(self):
+        print("[5168] 正在使用 Playwright 渲染爬取...")
         results = []
-        empty_count = 0
-        for page in range(1, MAX_PAGES + 1):
-            if empty_count >= 3:
-                break
-            print(f"[5168] 爬取第 {page} 頁")
-            try:
-                items = self._fetch_page(page)
-                if not items:
-                    empty_count += 1
-                    continue
-                count_before = len(results)
-                for item in items:
-                    enriched = self.enrich_listing(item)
-                    if self.basic_filter(enriched):
-                        results.append(enriched)
-                added = len(results) - count_before
-                print(f"[5168] 第 {page} 頁: {len(items)} 筆, 過濾後 +{added} 筆")
-                if added == 0 and len(items) > 0:
-                    empty_count += 1
-                else:
-                    empty_count = max(0, empty_count - 1)
-                self.sleep()
-            except Exception as e:
-                print(f"[5168] 第 {page} 頁錯誤: {e}")
-                break
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+                extra_http_headers={
+                    "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
+                }
+            )
+            page = context.new_page()
+
+            empty_count = 0
+            for pg in range(1, MAX_PAGES + 1):
+                if empty_count >= 3:
+                    break
+                print(f"[5168] 爬取第 {pg} 頁")
+
+                try:
+                    items = self._fetch_page_api(page, pg)
+                    if not items:
+                        empty_count += 1
+                        continue
+
+                    count_before = len(results)
+                    for item in items:
+                        enriched = self.enrich_listing(item)
+                        if self.basic_filter(enriched):
+                            results.append(enriched)
+                    added = len(results) - count_before
+                    print(f"[5168] 第 {pg} 頁: {len(items)} 筆, 過濾後 +{added} 筆")
+                    if added == 0 and len(items) > 0:
+                        empty_count += 1
+                    else:
+                        empty_count = max(0, empty_count - 1)
+                    self.sleep()
+
+                except Exception as e:
+                    print(f"[5168] 第 {pg} 頁錯誤: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    break
+
+            browser.close()
+
         print(f"[5168] 總計 {len(results)} 筆")
         return results
 
-    def _fetch_page(self, page):
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-            "Content-Type": "application/json",
-            "Referer": "https://www.houseprice.tw/",
-            "Origin": "https://www.houseprice.tw",
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
-        }
+    def _fetch_page_api(self, page, pg):
         payload = {
             "City": "台北市",
             "LTotalPrice": 300,
             "HTotalPrice": 1300,
-            "Page": page,
+            "Page": pg,
             "Rows": 30,
         }
-        resp = httpx.post(self.API_URL, json=payload, headers=headers, timeout=30)
-        print(f"  API POST → HTTP {resp.status_code}, response length={len(resp.text)}")
-        if resp.status_code != 200:
+
+        result = page.evaluate("""
+            async ([apiUrl, payload]) => {
+                const resp = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json, text/plain, */*',
+                        'Referer': 'https://www.houseprice.tw/',
+                        'Origin': 'https://www.houseprice.tw',
+                    },
+                    body: JSON.stringify(payload),
+                });
+                const text = await resp.text();
+                return {status: resp.status, body: text};
+            }
+        """, [self.API_URL, payload])
+
+        print(f"  API POST via browser → HTTP {result.get('status')}, response length={len(result.get('body', ''))}")
+
+        if result.get("status") != 200:
             return []
+
         try:
-            data = resp.json()
+            data = json.loads(result["body"])
         except Exception as e:
-            print(f"  JSON parse error: {e}, raw={resp.text[:300]}")
+            print(f"  JSON parse error: {e}, raw={result.get('body', '')[:300]}")
             return []
+
         cases = data.get("webCaseGroupings", [])
         total_count = data.get("count", data.get("totalCount", "unknown"))
         print(f"  API totalCount={total_count}, webCaseGroupings={len(cases)}")

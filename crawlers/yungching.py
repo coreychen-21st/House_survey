@@ -1,5 +1,5 @@
 import re
-import httpx
+from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 from .base import BaseCrawler
 from config.settings import MAX_PAGES
@@ -10,27 +10,75 @@ class YungChingCrawler(BaseCrawler):
     BASE_URL = "https://buy.yungching.com.tw"
 
     def crawl(self):
+        print("[永慶] 正在使用 Playwright 渲染爬取...")
         results = []
-        for page in range(1, MAX_PAGES + 1):
-            url = self._build_url(page)
-            print(f"[永慶] 爬取第 {page} 頁, url={url}")
-            try:
-                items = self._fetch_and_parse(url)
-                if not items:
-                    continue
-                filtered_count = 0
-                for item in items:
-                    enriched = self.enrich_listing(item)
-                    if self.basic_filter(enriched):
-                        results.append(enriched)
-                        filtered_count += 1
-                print(f"[永慶] 第 {page} 頁: {len(items)} 筆, 過濾後 {filtered_count} 筆")
-            except Exception as e:
-                print(f"[永慶] 第 {page} 頁錯誤: {e}")
-                import traceback
-                traceback.print_exc()
-                break
-            self.sleep()
+        empty_streak = 0
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+                extra_http_headers={
+                    "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
+                }
+            )
+            page = context.new_page()
+
+            for pg in range(1, MAX_PAGES + 1):
+                url = self._build_url(pg)
+                print(f"[永慶] 爬取第 {pg} 頁, url={url}")
+
+                try:
+                    page.goto(url, timeout=30000, wait_until="domcontentloaded")
+                    page.wait_for_timeout(3000)
+
+                    html = page.content()
+                    print(f"  HTML length={len(html)}, 含 'house/' = {html.count('house/')}")
+
+                    soup = BeautifulSoup(html, "lxml")
+                    cards = self._find_cards(soup)
+                    if not cards:
+                        print(f"  未找到卡片，結束")
+                        break
+
+                    filter_count = 0
+                    for card in cards:
+                        href = card.get("href", "")
+                        m = re.search(r"house/(\w+)", href)
+                        if not m:
+                            continue
+                        house_id = m.group(1)
+                        item = self._parse_card(card, house_id)
+                        if item:
+                            enriched = self.enrich_listing(item)
+                            ok, reason = self.basic_filter_debug(enriched)
+                            if ok:
+                                results.append(enriched)
+                                filter_count += 1
+                            elif pg <= 3:
+                                print(f"  過濾: {item.get('title','')[:30]} | price={item.get('total_price')} area={item.get('area_ping')} rooms={item.get('rooms')} age={item.get('building_age')} reason={reason}")
+
+                    print(f"[永慶] 第 {pg} 頁: {len(cards)} 卡片, 過濾後 {filter_count} 筆")
+
+                    if filter_count == 0:
+                        empty_streak += 1
+                    else:
+                        empty_streak = 0
+
+                    if empty_streak >= 3:
+                        print(f"  連續 {empty_streak} 頁無符合物件，停止")
+                        break
+
+                    self.sleep()
+
+                except Exception as e:
+                    print(f"[永慶] 第 {pg} 頁錯誤: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    break
+
+            browser.close()
+
         print(f"[永慶] 總計 {len(results)} 筆")
         return results
 
@@ -40,24 +88,7 @@ class YungChingCrawler(BaseCrawler):
             return base
         return base + f"?pg={page}"
 
-    def _fetch_and_parse(self, url):
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-            "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
-        }
-        resp = httpx.get(url, headers=headers, timeout=30, follow_redirects=True)
-        print(f"  HTTP {resp.status_code}, final_url={resp.url}")
-        if resp.status_code != 200:
-            return []
-
-        html = resp.text
-        print(f"  HTML length={len(html)}, 含 'house/' = {html.count('house/')}")
-
-        soup = BeautifulSoup(html, "lxml")
-
-        # 嘗試多種 selector
-        cards = []
+    def _find_cards(self, soup):
         selectors_to_try = [
             "a.link[href*='house/']",
             "a[href*='house/']",
@@ -70,29 +101,16 @@ class YungChingCrawler(BaseCrawler):
             cards = soup.select(sel)
             if cards:
                 print(f"  選擇器 '{sel}' 找到 {len(cards)} 個卡片")
-                break
+                return cards
 
-        if not cards:
-            cards = soup.find_all("a", href=re.compile(r"house/\d+"))
+        cards = soup.find_all("a", href=re.compile(r"house/\d+"))
+        if cards:
             print(f"  正則 fallback 找到 {len(cards)} 個卡片")
+            return cards
 
-        # If still no cards, dump HTML snippet for diagnosis
-        if not cards:
-            snippet = html[:3000].replace("\n", " ")
-            print(f"  HTML snippet: {snippet[:800]}...")
-            return []
-
-        items = []
-        for card in cards:
-            href = card.get("href", "")
-            m = re.search(r"house/(\d+)", href)
-            if not m:
-                continue
-            house_id = m.group(1)
-            item = self._parse_card(card, house_id)
-            if item:
-                items.append(item)
-        return items
+        snippet = str(soup)[:3000].replace("\n", " ")
+        print(f"  HTML snippet: {snippet[:800]}...")
+        return []
 
     def _parse_card(self, card, house_id):
         title = ""
