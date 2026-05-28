@@ -33,6 +33,9 @@ class YungChingCrawler(BaseCrawler):
                     page.wait_for_timeout(3000)
 
                     html = page.content()
+                    if self.is_blocked_page(html, page.title()):
+                        print("  偵測到 403/CloudFront 封鎖，快速停止")
+                        break
                     print(f"  HTML length={len(html)}, 含 'house/' = {html.count('house/')}")
 
                     soup = BeautifulSoup(html, "lxml")

@@ -94,6 +94,20 @@ class BaseCrawler:
             return False, "negative_desc"
         return True, ""
 
+    def is_blocked_page(self, html, title=""):
+        text = (str(title) + " " + str(html)[:4000]).lower()
+        blocked_markers = [
+            "403 error",
+            "request blocked",
+            "the request could not be satisfied",
+            "cloudfront",
+            "access denied",
+            "attention required",
+            "verify you are human",
+            "captcha",
+        ]
+        return any(marker in text for marker in blocked_markers)
+
     def enrich_listing(self, data):
         data["source"] = self.source
         data["address_hash"] = address_fingerprint(

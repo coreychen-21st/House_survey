@@ -22,6 +22,20 @@ class HousePriceCrawler(BaseCrawler):
                 }
             )
             page = context.new_page()
+            try:
+                page.goto("https://www.houseprice.tw/", timeout=30000, wait_until="domcontentloaded")
+                page.wait_for_timeout(2000)
+                html = page.content()
+                if self.is_blocked_page(html, page.title()):
+                    print("[5168] 偵測到 403/CloudFront 封鎖，快速停止")
+                    browser.close()
+                    print(f"[5168] 總計 {len(results)} 筆")
+                    return results
+            except Exception as e:
+                print(f"[5168] 首頁檢查失敗: {e}")
+                browser.close()
+                print(f"[5168] 總計 {len(results)} 筆")
+                return results
 
             empty_count = 0
             for pg in range(1, MAX_PAGES + 1):
@@ -70,20 +84,28 @@ class HousePriceCrawler(BaseCrawler):
 
         result = page.evaluate("""
             async ([apiUrl, payload]) => {
-                const resp = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json, text/plain, */*',
-                        'Referer': 'https://www.houseprice.tw/',
-                        'Origin': 'https://www.houseprice.tw',
-                    },
-                    body: JSON.stringify(payload),
-                });
-                const text = await resp.text();
-                return {status: resp.status, body: text};
+                try {
+                    const resp = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json, text/plain, */*',
+                            'Referer': 'https://www.houseprice.tw/',
+                            'Origin': 'https://www.houseprice.tw',
+                        },
+                        body: JSON.stringify(payload),
+                    });
+                    const text = await resp.text();
+                    return {status: resp.status, body: text, fetch_error: ''};
+                } catch (e) {
+                    return {status: 0, body: '', fetch_error: String(e)};
+                }
             }
         """, [self.API_URL, payload])
+
+        if result.get("fetch_error"):
+            print(f"  API fetch error: {result.get('fetch_error')}")
+            return []
 
         print(f"  API POST via browser → HTTP {result.get('status')}, response length={len(result.get('body', ''))}")
 

@@ -30,6 +30,11 @@ class F591Crawler(BaseCrawler):
                     page.goto(url, timeout=60000, wait_until="load")
                     page.wait_for_timeout(5000)
 
+                    html = page.content()
+                    if self.is_blocked_page(html, page.title()):
+                        print("  偵測到 403/CloudFront 封鎖，快速停止")
+                        break
+
                     # 滾動觸發 lazy loading
                     page.evaluate("window.scrollBy(0, 300)")
                     page.wait_for_timeout(2000)

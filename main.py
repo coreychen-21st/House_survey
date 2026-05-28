@@ -10,6 +10,7 @@ from crawlers.yungching import YungChingCrawler
 from crawlers.sinyi import SinyiCrawler
 from crawlers.f591 import F591Crawler
 from crawlers.houseprice import HousePriceCrawler
+from crawlers.housefun import HousefunCrawler
 from notifier.telegram import notify_batch
 
 
@@ -26,6 +27,7 @@ def run_all_crawlers():
     for name, crawler_cls in [
         ("永慶房屋", YungChingCrawler),
         ("信義房屋", SinyiCrawler),
+        ("好房網", HousefunCrawler),
         ("5168實價登錄比價王", HousePriceCrawler),
         ("591", F591Crawler),
     ]:
